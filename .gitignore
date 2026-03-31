@@ -2,3 +2,4 @@
 /target
 *.elf
 *.o
+/config/osmium.env

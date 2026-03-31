@@ -1,76 +1,81 @@
 # Osmium
 
-Osmium is now a raw AArch64 assembly firmware project for Raspberry Pi 4. There is no Rust, no Cargo, and no language runtime in the source tree. The firmware boots directly into a UART shell and keeps the command surface intentionally small.
+Osmium now targets Raspberry Pi OS compatibility directly. Instead of a custom raw firmware kernel, this repo builds a customized Raspberry Pi OS Bookworm Lite (64-bit) image for Raspberry Pi hardware, so standard Raspberry Pi OS / Debian arm64 packages and software continue to work.
 
-## What it has
+## What it builds
 
-- Pure assembly source in `firmware/osmium.S`
-- Direct Raspberry Pi 4 MMIO for UART and timer
-- UART shell with mac-style command names:
-  `help`, `clear`, `pwd`, `cd`, `ls`, `cat`, `echo`, `uname`, `date`, `weather`, `mkdir`, `touch`, `write`, `python`
-- RAM-backed filesystem with writable directories and files
-- Timer-backed Unix seconds counter
-- Cached weather file at `/etc/weather.txt`
-- Tiny `python` REPL for integer expressions and `print("text")`
+- Base OS: official Raspberry Pi OS (Legacy / Bookworm, 64-bit, Lite)
+- Output: a bootable `.img` file for Raspberry Pi
+- Customization method: macOS-side boot partition injection plus Raspberry Pi first-boot provisioning
+- Result: a stock-compatible Raspberry Pi OS image with:
+  - custom hostname and user
+  - SSH enabled
+  - Python, pip, git, curl, vim, htop, build-essential
+  - `python` symlinked to `python3`
+  - a simple `weather` command
+  - Osmium branding files under `/etc`
 
-## What it does not have
+## Why Bookworm Lite
 
-- Full macOS/BSD semantics
-- Persistent disk drivers
-- Live networking
-- Full Python / CPython
-- Desktop boot support
+The latest Raspberry Pi OS Trixie images use a newer `cloudinit-rpi` customization path. For local macOS image customization, Bookworm Lite is the simpler stable target because the official image manifest marks it as `init_format=systemd`, which allows a `firstrun.sh` boot-partition workflow.
 
-Those are separate milestones. This repo now matches the "raw boot assembly firmware" requirement, but it is still a small OS prototype, not a clone of macOS.
+## Quick start
 
-## Build
+1. Optional: copy the config template and edit it.
 
 ```bash
-./scripts/build-kernel.sh
+cd /Users/rishith/Developer/osmium
+cp config/osmium.env.example config/osmium.env
 ```
 
-This assembles and links the firmware directly and emits:
-
-- `build/boot/kernel8.img`
-- `build/boot/config.txt`
-- `build/obj/osmium.elf`
-
-## Boot on Raspberry Pi 4
-
-1. Format the Pi boot partition as `FAT32`.
-2. Copy `build/boot/kernel8.img` and `build/boot/config.txt` onto it.
-3. Copy Raspberry Pi firmware files onto the same partition. At minimum:
-   `start4.elf`, `fixup4.dat`, and `bcm2711-rpi-4-b.dtb`.
-4. Attach a serial adapter to the Pi UART.
-5. Open serial at `115200 8N1`.
-6. Power on the Pi.
-
-If you already have a mounted boot volume and a local firmware directory:
+2. Build the customized Raspberry Pi OS image.
 
 ```bash
-./scripts/stage-sd-card.sh /path/to/rpi-firmware /Volumes/BOOT
+./scripts/build-image.sh
 ```
 
-## Shell quick start
+This downloads the official base image, verifies its SHA-256, customizes it, and writes:
 
-```text
-help
-ls
-cat /etc/motd
-mkdir /home/projects
-touch /home/projects/todo.txt
-write /home/projects/todo.txt ship it
-date
-date +%s
-date set 1774828800
-weather
-weather set San Francisco: 64F, fog
-python
+- `build/images/osmium-rpi-os-bookworm-arm64-lite.img`
+
+3. Flash the image to an SD card.
+
+```bash
+./scripts/flash-image.sh build/images/osmium-rpi-os-bookworm-arm64-lite.img disk4
 ```
 
-## Source layout
+Replace `disk4` with the correct removable disk from `diskutil list`.
 
-- `firmware/osmium.S`: boot path, UART, shell, filesystem, date, weather, python REPL
-- `linker.ld`: image layout and boot stack
-- `scripts/build-kernel.sh`: assembly-only build
-- `scripts/stage-sd-card.sh`: copy helper for a mounted Pi boot volume
+## Configuration
+
+Default settings live in:
+
+- `config/osmium.env.example`
+
+Supported options:
+
+- `OSMIUM_HOSTNAME`
+- `OSMIUM_USERNAME`
+- `OSMIUM_PASSWORD`
+- `OSMIUM_TIMEZONE`
+- `OSMIUM_LOCALE`
+- `OSMIUM_PACKAGES`
+- `OSMIUM_WIFI_SSID`
+- `OSMIUM_WIFI_PSK`
+- `OSMIUM_WIFI_COUNTRY`
+
+Change `OSMIUM_PASSWORD` before flashing an image you plan to put on a real network.
+
+## Project layout
+
+- `scripts/download-base-image.sh`: resolves and downloads the official Raspberry Pi OS Bookworm Lite arm64 image from the official manifest
+- `scripts/build-image.sh`: verifies, customizes, and emits the final bootable image
+- `scripts/flash-image.sh`: writes the generated image to an SD card on macOS
+- `overlay/rootfs/`: files unpacked onto the Pi root filesystem during first boot
+- `config/osmium.env.example`: editable build configuration
+
+## Notes
+
+- This project is now designed for compatibility with Raspberry Pi OS software, not for custom-kernel experimentation.
+- The first boot performs package installation. Networking should be available if you want the package set installed immediately.
+- The generated image remains a Raspberry Pi OS / Debian arm64 system, so `apt` packages and standard Linux software continue to work.

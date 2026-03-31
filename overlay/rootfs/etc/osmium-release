@@ -1,0 +1,3 @@
+OSMIUM_FLAVOR=raspberry-pi-os-bookworm-lite
+OSMIUM_COMPAT=rpi-os
+
