@@ -44,7 +44,7 @@ This downloads the official base image, verifies its SHA-256, customizes it, and
 3. Flash the image to an SD card.
 
 ```bash
-./scripts/flash-image.sh build/images/osmium-rpi-os-bookworm-arm64-lite.img disk4
+./scripts/flash-image.sh build/images/osmium-rpi-os-bookworm-arm64-full.img disk4
 ```
 
 Replace `disk4` with the correct removable disk from `diskutil list`.
