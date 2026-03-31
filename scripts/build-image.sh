@@ -20,8 +20,11 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 OSMIUM_HOSTNAME="${OSMIUM_HOSTNAME:-osmium}"
+OSMIUM_BASE_PROFILE="${OSMIUM_BASE_PROFILE:-full}"
+OSMIUM_CREATE_DEFAULT_USER="${OSMIUM_CREATE_DEFAULT_USER:-false}"
 OSMIUM_USERNAME="${OSMIUM_USERNAME:-osmium}"
 OSMIUM_PASSWORD="${OSMIUM_PASSWORD:-osmium}"
+OSMIUM_ENABLE_DESKTOP_LOGIN="${OSMIUM_ENABLE_DESKTOP_LOGIN:-true}"
 OSMIUM_TIMEZONE="${OSMIUM_TIMEZONE:-America/Los_Angeles}"
 OSMIUM_LOCALE="${OSMIUM_LOCALE:-en_US.UTF-8}"
 OSMIUM_PACKAGES="${OSMIUM_PACKAGES:-python3 python3-pip git curl vim htop build-essential ca-certificates}"
@@ -29,6 +32,23 @@ OSMIUM_WIFI_SSID="${OSMIUM_WIFI_SSID:-}"
 OSMIUM_WIFI_PSK="${OSMIUM_WIFI_PSK:-}"
 OSMIUM_WIFI_COUNTRY="${OSMIUM_WIFI_COUNTRY:-US}"
 
+case "$OSMIUM_BASE_PROFILE" in
+  full)
+    IMAGE_NAME_FILTER='Raspberry Pi OS (Legacy, 64-bit) Full'
+    IMAGE_SLUG='bookworm-arm64-full'
+    ;;
+  lite)
+    IMAGE_NAME_FILTER='Raspberry Pi OS (Legacy, 64-bit) Lite'
+    IMAGE_SLUG='bookworm-arm64-lite'
+    ;;
+  *)
+    echo "Unsupported OSMIUM_BASE_PROFILE: $OSMIUM_BASE_PROFILE" >&2
+    echo "Use 'full' or 'lite'." >&2
+    exit 1
+    ;;
+esac
+
+OUTPUT_IMAGE="$IMAGE_DIR/osmium-rpi-os-$IMAGE_SLUG.img"
 SOURCE_XZ="$("$ROOT/scripts/download-base-image.sh")"
 
 if [[ ! -f "$MANIFEST_PATH" ]]; then
@@ -36,8 +56,8 @@ if [[ ! -f "$MANIFEST_PATH" ]]; then
   exit 1
 fi
 
-SOURCE_IMG="$IMAGE_DIR/rpios-bookworm-arm64-lite-base.img"
-EXPECTED_SHA="$(jq -r '.. | objects | select(.name? == "Raspberry Pi OS (Legacy, 64-bit) Lite") | .extract_sha256' "$MANIFEST_PATH")"
+SOURCE_IMG="$IMAGE_DIR/rpios-$IMAGE_SLUG-base.img"
+EXPECTED_SHA="$(jq -r --arg name "$IMAGE_NAME_FILTER" '.. | objects | select(.name? == $name) | .extract_sha256' "$MANIFEST_PATH")"
 
 if [[ ! -f "$SOURCE_IMG" ]]; then
   xz -dkc "$SOURCE_XZ" > "$SOURCE_IMG"
@@ -85,14 +105,18 @@ TARGET_HOSTNAME='${OSMIUM_HOSTNAME}'
 TARGET_TIMEZONE='${OSMIUM_TIMEZONE}'
 TARGET_LOCALE='${OSMIUM_LOCALE}'
 TARGET_PACKAGES='${OSMIUM_PACKAGES}'
+CREATE_DEFAULT_USER='${OSMIUM_CREATE_DEFAULT_USER}'
+ENABLE_DESKTOP_LOGIN='${OSMIUM_ENABLE_DESKTOP_LOGIN}'
 
-if [ -x /usr/lib/userconf-pi/userconf ]; then
-  /usr/lib/userconf-pi/userconf "\$TARGET_USER" "\$TARGET_HASH"
-elif ! id -u "\$TARGET_USER" >/dev/null 2>&1; then
-  useradd -m -G users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo -s /bin/bash "\$TARGET_USER"
-  echo "\$TARGET_USER:${OSMIUM_PASSWORD}" | chpasswd
-else
-  echo "\$TARGET_USER:\$TARGET_HASH" | chpasswd -e
+if [ "\$CREATE_DEFAULT_USER" = "true" ]; then
+  if [ -x /usr/lib/userconf-pi/userconf ]; then
+    /usr/lib/userconf-pi/userconf "\$TARGET_USER" "\$TARGET_HASH"
+  elif ! id -u "\$TARGET_USER" >/dev/null 2>&1; then
+    useradd -m -G users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo -s /bin/bash "\$TARGET_USER"
+    echo "\$TARGET_USER:${OSMIUM_PASSWORD}" | chpasswd
+  else
+    echo "\$TARGET_USER:\$TARGET_HASH" | chpasswd -e
+  fi
 fi
 
 echo "\$TARGET_HOSTNAME" >/etc/hostname
@@ -112,6 +136,11 @@ update-locale LANG="\$TARGET_LOCALE" || true
 
 systemctl enable ssh || true
 touch /boot/ssh
+
+if [ "\$ENABLE_DESKTOP_LOGIN" = "true" ] && [ -f /etc/lightdm/lightdm.conf ]; then
+  sed -i '/^autologin-user=/d' /etc/lightdm/lightdm.conf || true
+  sed -i '/^autologin-user-timeout=/d' /etc/lightdm/lightdm.conf || true
+fi
 
 if [ -f /boot/osmium-rootfs-overlay.tgz ]; then
   tar -xzf /boot/osmium-rootfs-overlay.tgz -C /
@@ -189,7 +218,9 @@ fi
 
 cp "$FIRSTRUN_SH" "$BOOT_MOUNT/firstrun.sh"
 cp "$OVERLAY_TAR" "$BOOT_MOUNT/osmium-rootfs-overlay.tgz"
-cp "$USERCONF_TXT" "$BOOT_MOUNT/userconf.txt"
+if [[ "$OSMIUM_CREATE_DEFAULT_USER" == "true" ]]; then
+  cp "$USERCONF_TXT" "$BOOT_MOUNT/userconf.txt"
+fi
 touch "$BOOT_MOUNT/ssh"
 
 if [[ -f "$WPA_CONF" ]]; then

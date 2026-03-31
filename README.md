@@ -1,13 +1,16 @@
 # Osmium
 
-Osmium now targets Raspberry Pi OS compatibility directly. Instead of a custom raw firmware kernel, this repo builds a customized Raspberry Pi OS Bookworm Lite (64-bit) image for Raspberry Pi hardware, so standard Raspberry Pi OS / Debian arm64 packages and software continue to work.
+Osmium now targets Raspberry Pi OS compatibility directly. Instead of a custom raw firmware kernel, this repo builds a customized Raspberry Pi OS Bookworm (64-bit) image for Raspberry Pi hardware, so standard Raspberry Pi OS / Debian arm64 packages and software continue to work. The default target is the Full desktop image, so you get the normal graphical Raspberry Pi desktop, file manager, terminal, browser, and application stack.
 
 ## What it builds
 
-- Base OS: official Raspberry Pi OS (Legacy / Bookworm, 64-bit, Lite)
+- Base OS: official Raspberry Pi OS (Legacy / Bookworm, 64-bit), defaulting to the Full desktop image
 - Output: a bootable `.img` file for Raspberry Pi
 - Customization method: macOS-side boot partition injection plus Raspberry Pi first-boot provisioning
 - Result: a stock-compatible Raspberry Pi OS image with:
+  - full desktop UI by default
+  - browser, desktop shell, folders, terminal, and normal Raspberry Pi OS desktop apps
+  - desktop login screen support
   - custom hostname and user
   - SSH enabled
   - Python, pip, git, curl, vim, htop, build-essential
@@ -15,9 +18,9 @@ Osmium now targets Raspberry Pi OS compatibility directly. Instead of a custom r
   - a simple `weather` command
   - Osmium branding files under `/etc`
 
-## Why Bookworm Lite
+## Why Bookworm
 
-The latest Raspberry Pi OS Trixie images use a newer `cloudinit-rpi` customization path. For local macOS image customization, Bookworm Lite is the simpler stable target because the official image manifest marks it as `init_format=systemd`, which allows a `firstrun.sh` boot-partition workflow.
+The latest Raspberry Pi OS Trixie images use a newer `cloudinit-rpi` customization path. For local macOS image customization, Bookworm is the simpler stable target because the official image manifest marks the legacy Bookworm images as `init_format=systemd`, which allows a `firstrun.sh` boot-partition workflow. The default Osmium profile now uses the Full desktop Bookworm image; you can switch to Lite in config if you want a smaller headless image.
 
 ## Quick start
 
@@ -34,9 +37,9 @@ cp config/osmium.env.example config/osmium.env
 ./scripts/build-image.sh
 ```
 
-This downloads the official base image, verifies its SHA-256, customizes it, and writes:
+This downloads the official base image, verifies its SHA-256, customizes it, and writes a desktop-ready image such as:
 
-- `build/images/osmium-rpi-os-bookworm-arm64-lite.img`
+- `build/images/osmium-rpi-os-bookworm-arm64-full.img`
 
 3. Flash the image to an SD card.
 
@@ -55,8 +58,11 @@ Default settings live in:
 Supported options:
 
 - `OSMIUM_HOSTNAME`
+- `OSMIUM_BASE_PROFILE`
+- `OSMIUM_CREATE_DEFAULT_USER`
 - `OSMIUM_USERNAME`
 - `OSMIUM_PASSWORD`
+- `OSMIUM_ENABLE_DESKTOP_LOGIN`
 - `OSMIUM_TIMEZONE`
 - `OSMIUM_LOCALE`
 - `OSMIUM_PACKAGES`
@@ -64,11 +70,13 @@ Supported options:
 - `OSMIUM_WIFI_PSK`
 - `OSMIUM_WIFI_COUNTRY`
 
-Change `OSMIUM_PASSWORD` before flashing an image you plan to put on a real network.
+If `OSMIUM_CREATE_DEFAULT_USER=false`, Osmium preserves the normal first-boot account-creation flow instead of pre-seeding a user. Use that if you want a more stock desktop setup experience.
+
+Change `OSMIUM_PASSWORD` before flashing an image you plan to put on a real network if you enable default-user creation.
 
 ## Project layout
 
-- `scripts/download-base-image.sh`: resolves and downloads the official Raspberry Pi OS Bookworm Lite arm64 image from the official manifest
+- `scripts/download-base-image.sh`: resolves and downloads the official Raspberry Pi OS Bookworm arm64 image from the official manifest
 - `scripts/build-image.sh`: verifies, customizes, and emits the final bootable image
 - `scripts/flash-image.sh`: writes the generated image to an SD card on macOS
 - `overlay/rootfs/`: files unpacked onto the Pi root filesystem during first boot
@@ -78,4 +86,5 @@ Change `OSMIUM_PASSWORD` before flashing an image you plan to put on a real netw
 
 - This project is now designed for compatibility with Raspberry Pi OS software, not for custom-kernel experimentation.
 - The first boot performs package installation. Networking should be available if you want the package set installed immediately.
+- The default profile is large: the official Full desktop image is roughly 3.4 GB compressed and 16 GB extracted.
 - The generated image remains a Raspberry Pi OS / Debian arm64 system, so `apt` packages and standard Linux software continue to work.

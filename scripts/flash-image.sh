@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE_PATH="${1:-$ROOT/build/images/osmium-rpi-os-bookworm-arm64-lite.img}"
+DEFAULT_IMAGE="$(find "$ROOT/build/images" -maxdepth 1 -type f -name 'osmium-rpi-os-*.img' | sort | tail -n 1)"
+IMAGE_PATH="${1:-$DEFAULT_IMAGE}"
 DISK_ID="${2:-}"
 
 if [[ -z "$DISK_ID" ]]; then
@@ -22,4 +23,3 @@ diskutil unmountDisk "/dev/$DISK_ID"
 sudo dd if="$IMAGE_PATH" of="/dev/r${DISK_ID}" bs=8m status=progress
 sync
 diskutil eject "/dev/$DISK_ID"
-
