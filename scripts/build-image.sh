@@ -71,7 +71,11 @@ if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
   exit 1
 fi
 
-cp "$SOURCE_IMG" "$OUTPUT_IMAGE"
+rm -f "$OUTPUT_IMAGE"
+# Prefer APFS clone-copy on macOS to avoid a full 15+ GB duplicate write.
+if ! cp -c "$SOURCE_IMG" "$OUTPUT_IMAGE" 2>/dev/null; then
+  cp "$SOURCE_IMG" "$OUTPUT_IMAGE"
+fi
 
 OVERLAY_TAR="$WORK_DIR/osmium-rootfs-overlay.tgz"
 FIRSTRUN_SH="$WORK_DIR/firstrun.sh"
