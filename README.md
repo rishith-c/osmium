@@ -49,6 +49,24 @@ This downloads the official base image, verifies its SHA-256, customizes it, and
 
 Replace `disk4` with the correct removable disk from `diskutil list`.
 
+## Run In QEMU On macOS
+
+You can also try booting the built image under QEMU's Raspberry Pi 4 model on a Mac:
+
+```bash
+bash ./scripts/run-qemu.sh --headless
+```
+
+That path is verified to boot the Raspberry Pi kernel and print serial logs in the terminal.
+
+To try a windowed run instead:
+
+```bash
+bash ./scripts/run-qemu.sh --window
+```
+
+QEMU's `raspi4b` emulation is still incomplete, so a full Raspberry Pi OS desktop session is not guaranteed under emulation even though the kernel starts. Real hardware remains the reliable target for the full desktop experience.
+
 ## Configuration
 
 Default settings live in:
