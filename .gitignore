@@ -1,5 +1,16 @@
-/build
-/target
-*.elf
+# Build artifacts
+build/
+*.bin
 *.o
-/config/osmium.env
+*.elf
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS/system files
+.DS_Store
+Thumbs.db
